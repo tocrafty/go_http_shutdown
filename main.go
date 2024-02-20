@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -39,23 +40,11 @@ func main() {
 		}),
 	}
 
-	wait := make(chan struct{})
-	go func() {
-		fmt.Println("ListenAndServe:8002",
-			http.ListenAndServe(":8002", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				//fmt.Println("http.Server.Shutdown", s.Close())
-				fmt.Println("http.Server.Shutdown", s.Shutdown(context.Background()))
-				close(wait)
-				w.WriteHeader(http.StatusOK)
-			})))
-	}()
-
 	go func() {
 		fmt.Println("http.Server.Serve", s.Serve(l))
 	}()
 
 	timeout := time.Second * 2
-	addr := l.Addr().String()
 	c := http.Client{
 		Transport: &http.Transport{
 			ForceAttemptHTTP2:   false,
@@ -63,8 +52,12 @@ func main() {
 		},
 		Timeout: timeout,
 	}
+	addr := l.Addr().String()
+	var wg sync.WaitGroup
 	for i := 0; i < N; i++ {
+		wg.Add(1)
 		go func(i int) {
+			defer wg.Done()
 			for {
 				rsp, err := c.Post(
 					"http://"+addr+"/",
@@ -90,8 +83,11 @@ func main() {
 			}
 		}(i)
 	}
-	<-wait
+
 	time.Sleep(timeout * 3)
+	fmt.Println("http.Server.Shutdown", s.Shutdown(context.Background()))
+	wg.Wait()
+
 	for i := 0; i < N; i++ {
 		if clientData[i] != serverData[i] {
 			fmt.Printf("data at index %d mismatch, client %d, server %d\n", i, clientData[i], serverData[i])
