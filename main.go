@@ -74,17 +74,18 @@ func main() {
 					if strings.Contains(err.Error(), "connection refused") {
 						return
 					}
-					fmt.Println("Get", err)
+					fmt.Println("Post", err)
 					return
 				} else if rsp.StatusCode != http.StatusOK {
-					fmt.Println("Get", rsp.StatusCode)
+					fmt.Println("Post", rsp.StatusCode)
 					return
 				}
+
+				clientData[i]++
 				if _, err = io.ReadAll(rsp.Body); err != nil {
 					fmt.Println("read body error", err)
 					return
 				}
-				clientData[i]++
 				rsp.Body.Close()
 			}
 		}(i)
